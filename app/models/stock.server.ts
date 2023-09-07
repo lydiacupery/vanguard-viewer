@@ -126,72 +126,153 @@ interface CategoryNode {
   category: string;
   id: string;
   children: CategoryNode[];
+  parentId?: string;
+  holdings: Holding[];
+  total?: number;
 }
 
-const buildCategoryHierarchy = (
+// export const buildCategoryHierarchy = (
+//   rawData: RawCategory[],
+//   holdings:
+//     | Array<
+//         Holding & { security: Security; categoryId: string | null | undefined }
+//       >
+//     | undefined
+// ): CategoryNode[] => {
+//   const createNode = R.applySpec<CategoryNode>({
+//     category: R.prop("name"),
+//     id: R.prop("id"),
+//     children: R.always([]),
+//   });
+
+//   const addNodeToMap = (
+//     map: Record<string, CategoryNode>,
+//     node: CategoryNode
+//   ) => R.assoc(node.id, node, map);
+
+//   const addChildToParent = (
+//     map: Record<string, CategoryNode>,
+//     parentId: string,
+//     child: CategoryNode
+//   ) => {
+//     const holdingsForCategory = (holdings || []).filter(
+//       (holding) => holding.categoryId === child.id
+//     );
+//     console.log("holdingsForCategory", holdingsForCategory);
+//     const updatedMap = R.evolve(
+//       {
+//         [parentId]: (parent: CategoryNode) => ({
+//           ...parent,
+//           children: [
+//             ...parent.children,
+//             { ...child, holdings: holdingsForCategory },
+//           ],
+//         }),
+//       },
+//       map
+//     );
+//     return updatedMap;
+//     // remove child from map
+//     // return R.dissoc(child.id, updatedMap);
+//   };
+
+//   const initializeMap = R.pipe(
+//     R.map(createNode),
+//     R.reduce(addNodeToMap, {} as Record<string, CategoryNode>)
+//   );
+
+//   const linkChildren = (
+//     map: Record<string, CategoryNode>,
+//     rawCategory: RawCategory
+//   ) => {
+//     if (rawCategory.parentId) {
+//       const child = R.prop(rawCategory.id, map);
+//       return addChildToParent(map, rawCategory.parentId, child);
+//     }
+//     return map;
+//   };
+
+//   const hierarchicalMap = R.pipe(
+//     initializeMap,
+//     (map: Record<string, CategoryNode>) => R.reduce(linkChildren, map)(rawData)
+//   );
+
+//   const hierarchicalData = R.values(hierarchicalMap(rawData));
+
+//   return hierarchicalData;
+// };
+
+// new
+export const buildCategoryHierarchy = (
   rawData: RawCategory[],
   holdings:
     | Array<
-        Holding & { security: Security; categoryId: string | null | undefined }
+        Holding & {
+          security: Security;
+          categoryId: string | null | undefined;
+        }
       >
     | undefined
 ): CategoryNode[] => {
-  const createNode = R.applySpec<CategoryNode>({
-    category: R.prop("name"),
-    id: R.prop("id"),
-    children: R.always([]),
+  const createNode = (rawCategory: RawCategory): CategoryNode => {
+    const holdingsForCategory = (holdings || []).filter(
+      (holding) => holding.categoryId === rawCategory.id
+    );
+
+    return {
+      category: rawCategory.name,
+      id: rawCategory.id,
+      children: [],
+      holdings: holdingsForCategory,
+      parentId: rawCategory.parentId ?? undefined,
+    };
+  };
+
+  const categoryMap: Record<string, CategoryNode> = {};
+
+  rawData.forEach((rawCategory) => {
+    const node = createNode(rawCategory);
+    categoryMap[node.id] = node;
+
+    if (rawCategory.parentId) {
+      const parent = categoryMap[rawCategory.parentId];
+      if (parent) {
+        parent.children.push(node);
+      }
+    }
   });
 
-  const addNodeToMap = (
-    map: Record<string, CategoryNode>,
-    node: CategoryNode
-  ) => R.assoc(node.id, node, map);
+  const addTotalsToNode = (node: CategoryNode): CategoryNode => {
+    // recursively add a total to all the children
+    node.children.forEach((child) => {
+      if (child.children.length > 0 || child.holdings.length > 0) {
+        addTotalsToNode(child);
+      }
+    });
+    const total =
+      node.children.reduce((acc, child) => acc + (child.total || 0), 0) +
+      node.holdings.reduce(
+        (acc, holding) => acc + holding.institution_price,
+        0
+      );
 
-  const addChildToParent = (
-    map: Record<string, CategoryNode>,
-    parentId: string,
-    child: CategoryNode
-  ) => {
-    console.log({ holdings });
-    const holdingsForCategory = (holdings || []).filter(
-      (holding) => holding.categoryId === child.id
-    );
-    return R.evolve(
-      {
-        [parentId]: (parent: CategoryNode) => ({
-          ...parent,
-          children: [
-            ...parent.children,
-            { ...child, holdings: holdingsForCategory },
-          ],
-        }),
-      },
-      map
-    );
+    node.total = total;
+    return node;
   };
 
-  const initializeMap = R.pipe(
-    R.map(createNode),
-    R.reduce(addNodeToMap, {} as Record<string, CategoryNode>)
-  );
-
-  const linkChildren = (
-    map: Record<string, CategoryNode>,
-    rawCategory: RawCategory
-  ) => {
-    if (rawCategory.parentId) {
-      const child = R.prop(rawCategory.id, map);
-      return addChildToParent(map, rawCategory.parentId, child);
+  // Find root categories (those with no parent)
+  const rootCategories: CategoryNode[] = [];
+  Object.values(categoryMap).forEach((node) => {
+    if (!node.category || node.category === "null") {
+      // Handle cases where "null" is used as a placeholder for a missing category name
+      node.category = "Uncategorized";
     }
-    return map;
-  };
+    if (!node.parentId || !categoryMap[node.parentId]) {
+      // parent node, add totals
+      addTotalsToNode(node);
+      rootCategories.push(node);
+    }
+  });
 
-  const hierarchicalMap = R.pipe(
-    initializeMap,
-    (map: Record<string, CategoryNode>) => R.reduce(linkChildren, map)(rawData)
-  );
-
-  const hierarchicalData = R.values(hierarchicalMap(rawData));
-
-  return hierarchicalData;
+  return rootCategories;
 };

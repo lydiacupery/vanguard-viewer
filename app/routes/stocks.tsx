@@ -22,6 +22,42 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { AccordionContent } from "@radix-ui/react-accordion";
+import { sort } from "ramda";
+
+const sortByTotal = (a: { total?: number }, b: { total?: number }) => {
+  if (a.total === undefined || b.total === undefined) return 0;
+  if (a.total > b.total) {
+    return -1;
+  }
+  if (a.total < b.total) {
+    return 1;
+  }
+  return 0;
+};
+
+const sortByInstiutionPrice = (
+  a: { institution_price?: number },
+  b: { institution_price?: number }
+) => {
+  if (a.institution_price === undefined || b.institution_price === undefined)
+    return 0;
+  if (a.institution_price > b.institution_price) {
+    return -1;
+  }
+  if (a.institution_price < b.institution_price) {
+    return 1;
+  }
+  return 0;
+};
+
+const recursivelySortChildrenByTotal = (rows: Array<Data>) => {
+  rows.sort((a, b) => sortByTotal(a, b));
+  rows.forEach((row) =>
+    row.children.length
+      ? recursivelySortChildrenByTotal(row.children)
+      : row.holdings.sort((a, b) => sortByInstiutionPrice(a, b))
+  );
+};
 
 export async function loader({ request, params }: LoaderArgs) {
   const session = await getSession(request);
@@ -30,11 +66,15 @@ export async function loader({ request, params }: LoaderArgs) {
     filters: params.accountId ? { accountId: params.accountId } : {},
   });
 
-  console.log({
-    accountsWithHoldings: JSON.stringify(accountsWithHoldings, null, 2),
-  });
+  // sort the array by total
+  // accountsWithHoldings.map((account) =>
+  //   account.categoryHierarchyWithHolding.sort((a, b) => sortByTotal(a, b))
+  // );
+  recursivelySortChildrenByTotal(
+    accountsWithHoldings[0].categoryHierarchyWithHolding
+  );
   return json({
-    accountsWithHoldings,
+    accountsWithHoldings: accountsWithHoldings,
     accountId: params.accountId,
   });
 }
@@ -108,7 +148,15 @@ const RenderCategory = ({ row }: { row: Data }) => {
     <Accordion type="multiple" style={{ paddingLeft: "20px" }}>
       <AccordionItem value="item-1">
         <AccordionTrigger>
-          <h4>Category: {row.category}</h4>
+          <div className="flex w-full justify-between px-10">
+            <h4>Category: {row.category}</h4>
+            <h4>
+              {`${Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD",
+              }).format(row.total || 0)}`}{" "}
+            </h4>
+          </div>
         </AccordionTrigger>
         <AccordionContent>
           {row.children.length ? (
