@@ -34,6 +34,7 @@ function createDatabaseSessionStorage({ cookie }) {
         data: {
           expiresAt: expires,
           userId: data.userId,
+          accessToken: data.access_token,
         },
       });
 

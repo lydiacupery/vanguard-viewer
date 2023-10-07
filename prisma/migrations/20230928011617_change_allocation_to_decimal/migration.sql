@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Asset" ALTER COLUMN "allocation" SET DATA TYPE DECIMAL(65,30);

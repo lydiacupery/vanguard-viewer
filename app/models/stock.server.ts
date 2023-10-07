@@ -4,6 +4,8 @@ import { plaidClient } from "~/plaid";
 import { fetchCategoriesForTickerList } from "~/routes/yahoo-finance";
 import * as R from "ramda";
 import { prisma } from "~/db.server";
+import { Asset, TargetCategoryAllocation } from "@prisma/client";
+import { Decimal } from "@prisma/client/runtime";
 
 export const getAccountsWithHoldings = async ({
   session,
@@ -25,7 +27,6 @@ export const getAccountsWithHoldings = async ({
 
   // account info
   const accounts = response.data.accounts;
-  console.log("accounts", accounts);
 
   const holdings = response.data.holdings;
 
@@ -45,7 +46,7 @@ export const getAccountsWithHoldings = async ({
   const holdingsWithSecurity = await Promise.all(
     holdings.map(async (holding) => {
       const security = securitiesMap[holding.security_id];
-      const asset = await prisma.asset.findFirst({
+      const assetCategories = await prisma.asset.findMany({
         where: {
           ticker: security.ticker_symbol || undefined,
         },
@@ -53,7 +54,7 @@ export const getAccountsWithHoldings = async ({
       return {
         ...holding,
         security,
-        categoryId: asset?.categoryID,
+        assetCategories,
       };
     })
   );
@@ -88,30 +89,55 @@ export const getAccountsWithHoldings = async ({
     ORDER BY level, id;
   `);
 
-  const accountsWithCategories = accounts.map((account) => {
-    const categoryHierarchy = buildCategoryHierarchy(
-      categoryHierarchies,
-      holdingsByAccount[account.account_id]
-    );
-    console.log("categoryHierarchy", categoryHierarchy);
-
-    const categoryHierarchyWithHolding = categoryHierarchy.map((category) => {
-      // only need to find holding if category is a leaf node
-      const holdings = holdingsByAccount[account.account_id] || [];
-      const holdingsInCategory = holdings.filter(
-        (holding) => holding.categoryId === category.id
-      );
-      return {
-        ...category,
-        holdings: holdingsInCategory,
-      };
+  const targetAllocationsForUser =
+    await prisma.targetCategoryAllocation.findMany({
+      where: {
+        // userID: session.get("userID"),
+      },
     });
 
-    return {
-      ...account,
-      categoryHierarchyWithHolding,
-    };
-  });
+  const accountsWithCategories = await Promise.all(
+    accounts.map(async (account) => {
+      const categoryHierarchy = buildCategoryHierarchy(
+        categoryHierarchies,
+        holdingsByAccount[account.account_id],
+        targetAllocationsForUser
+      );
+
+      const categoryHierarchyWithHolding = await Promise.all(
+        categoryHierarchy.map(async (category) => {
+          // only need to find holding if category is a leaf node
+          const holdings = holdingsByAccount[account.account_id] || [];
+          const targetAllocation =
+            await prisma.targetCategoryAllocation.findFirst({
+              where: {
+                categoryID: category.id,
+                // userID: session.get("userID"),
+              },
+            });
+
+          console.log({ targetAllocation });
+          const holdingsInCategory = holdings.filter((holding) =>
+            holding.assetCategories
+              .map((ac) => ac.categoryID)
+              .includes(category.id)
+          );
+          return {
+            ...category,
+            holdings: holdingsInCategory,
+            targetAllocation: targetAllocation?.allocation,
+          };
+        })
+      );
+
+      console.log("what is this account??", account);
+
+      return {
+        ...account,
+        categoryHierarchyWithHolding,
+      };
+    })
+  );
   return accountsWithCategories;
 };
 
@@ -129,6 +155,7 @@ interface CategoryNode {
   parentId?: string;
   holdings: Holding[];
   total?: number;
+  targetAllocation: number;
 }
 
 // export const buildCategoryHierarchy = (
@@ -209,21 +236,56 @@ export const buildCategoryHierarchy = (
     | Array<
         Holding & {
           security: Security;
-          categoryId: string | null | undefined;
+          assetCategories: Array<{
+            allocation: Decimal;
+            categoryID: string | null;
+          }>;
         }
       >
-    | undefined
+    | undefined,
+  targetAllocationsForUser: TargetCategoryAllocation[]
 ): CategoryNode[] => {
+  console.log(
+    "inputted holding....",
+    holdings?.map((h) => h.assetCategories)
+  );
   const createNode = (rawCategory: RawCategory): CategoryNode => {
-    const holdingsForCategory = (holdings || []).filter(
-      (holding) => holding.categoryId === rawCategory.id
+    const holdingsForCategory = (holdings || []).filter((holding) =>
+      holding.assetCategories
+        .map((ac) => ac.categoryID)
+        .includes(rawCategory.id)
+    );
+
+    const targetAllocation = targetAllocationsForUser.find(
+      (ta) => ta.categoryID === rawCategory.id
     );
 
     return {
+      targetAllocation: targetAllocation?.allocation
+        ? Number.parseFloat(targetAllocation.allocation.toString())
+        : 0,
       category: rawCategory.name,
       id: rawCategory.id,
       children: [],
-      holdings: holdingsForCategory,
+      holdings: holdingsForCategory.map((holding) => {
+        const allocation = holding.assetCategories.find(
+          (ac) => ac.categoryID === rawCategory.id
+        )?.allocation;
+        console.log(
+          "allocation",
+          allocation,
+          holding.assetCategories.find((ac) => ac.categoryID === rawCategory.id)
+        );
+        console.log("holding...", holding);
+        const institution_value = allocation
+          ? parseFloat(allocation.toString()) * holding.institution_value
+          : holding.institution_value;
+        return {
+          ...holding,
+          institution_value,
+          allocation,
+        };
+      }),
       parentId: rawCategory.parentId ?? undefined,
     };
   };
@@ -252,7 +314,7 @@ export const buildCategoryHierarchy = (
     const total =
       node.children.reduce((acc, child) => acc + (child.total || 0), 0) +
       node.holdings.reduce(
-        (acc, holding) => acc + holding.institution_price,
+        (acc, holding) => acc + holding.institution_value,
         0
       );
 

@@ -35,16 +35,16 @@ const sortByTotal = (a: { total?: number }, b: { total?: number }) => {
   return 0;
 };
 
-const sortByInstiutionPrice = (
-  a: { institution_price?: number },
-  b: { institution_price?: number }
+const sortByInstiutionValue = (
+  a: { institution_value?: number },
+  b: { institution_value?: number }
 ) => {
-  if (a.institution_price === undefined || b.institution_price === undefined)
+  if (a.institution_value === undefined || b.institution_value === undefined)
     return 0;
-  if (a.institution_price > b.institution_price) {
+  if (a.institution_value > b.institution_value) {
     return -1;
   }
-  if (a.institution_price < b.institution_price) {
+  if (a.institution_value < b.institution_value) {
     return 1;
   }
   return 0;
@@ -53,9 +53,9 @@ const sortByInstiutionPrice = (
 const recursivelySortChildrenByTotal = (rows: Array<Data>) => {
   rows.sort((a, b) => sortByTotal(a, b));
   rows.forEach((row) =>
-    row.children.length
+    row.children && row.children.length
       ? recursivelySortChildrenByTotal(row.children)
-      : row.holdings.sort((a, b) => sortByInstiutionPrice(a, b))
+      : row.holdings.sort((a, b) => sortByInstiutionValue(a, b))
   );
 };
 
@@ -91,6 +91,15 @@ export const columns: ColumnDef<Holding>[] = [
     header: "Ticker",
   },
   {
+    accessorKey: "allocation",
+    header: "Allocation",
+    cell({ getValue }) {
+      return `${Intl.NumberFormat("en-US", {
+        style: "percent",
+      }).format(getValue() as number)}`;
+    },
+  },
+  {
     accessorKey: "institution_value",
     header: "Institution Value",
     cell({ getValue }) {
@@ -124,7 +133,12 @@ export default function Stocks() {
               //     <h4>Category: {categoryHierarchyWithHolding.category}</h4>
               //     <RenderHoldings row={categoryHierarchyWithHolding} />
               //   </div>
-              <RenderCategory row={categoryHierarchyWithHolding} />
+              // need to get totalamount from server or have allocations be based on parent
+              <RenderCategory
+                row={categoryHierarchyWithHolding}
+                totalAmount={data.accountsWithHoldings[0].balances.current}
+                depth={0}
+              />
             );
           })
       ) : (
@@ -143,30 +157,88 @@ export default function Stocks() {
   );
 }
 
-const RenderCategory = ({ row }: { row: Data }) => {
+const RenderCategory = ({
+  row,
+  totalAmount,
+  depth,
+}: {
+  row: Data;
+  totalAmount?: number;
+  depth: number;
+}) => {
+  console.log("row???", row);
+
+  const targetAllocation =
+    row.targetAllocation && (totalAmount || 0) * (row.targetAllocation || 0);
+
+  const differenceBetweenActualAndTarget = (row.total || 0) - targetAllocation;
   return (
-    <Accordion type="multiple" style={{ paddingLeft: "20px" }}>
+    <Accordion type="multiple">
       <AccordionItem value="item-1">
         <AccordionTrigger>
-          <div className="flex w-full justify-between px-10">
-            <h4>Category: {row.category}</h4>
-            <h4>
-              {`${Intl.NumberFormat("en-US", {
-                style: "currency",
-                currency: "USD",
-              }).format(row.total || 0)}`}{" "}
+          <div className="flex w-full gap-24  px-10">
+            <h4 style={{ width: 300, textAlign: "left" }}>
+              {"\u25B6\uFE0F".repeat(depth)} Category: {row.category}
             </h4>
+
+            <p style={{ width: 200, textAlign: "left" }}>
+              Target Allocation:{" "}
+              {targetAllocation
+                ? Intl.NumberFormat("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                  }).format(targetAllocation)
+                : "-"}
+            </p>
+            <p style={{ width: 200 }}>
+              Actual Allocation:{" "}
+              {row.total
+                ? Intl.NumberFormat("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                  }).format(row.total)
+                : "-"}
+            </p>
+            <p
+              style={{
+                color: differenceBetweenActualAndTarget > 0 ? "green" : "red",
+                width: 200,
+                backgroundColor:
+                  (Math.abs(differenceBetweenActualAndTarget) > 1000 &&
+                    "lightGray") ||
+                  undefined,
+              }}
+            >
+              Difference
+              {
+                // show plus or minus based on differenceBetweenTargetAndActual
+                differenceBetweenActualAndTarget > 0 ? "+" : ""
+              }
+              {targetAllocation
+                ? Intl.NumberFormat("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                  }).format(differenceBetweenActualAndTarget)
+                : "-"}
+            </p>
           </div>
         </AccordionTrigger>
         <AccordionContent>
           {row.children.length ? (
             <>
               {row.children.map((child) => (
-                <RenderCategory row={child} key={child.id} />
+                <RenderCategory
+                  row={child}
+                  key={child.id}
+                  totalAmount={totalAmount}
+                  depth={depth + 1}
+                />
               ))}
             </>
           ) : (
-            <RenderHoldings row={row.holdings} />
+            <div className="pl-20">
+              <RenderHoldings row={row.holdings} />
+            </div>
           )}
         </AccordionContent>
       </AccordionItem>
@@ -181,7 +253,7 @@ type Data = Awaited<
 >["accountsWithHoldings"][0]["categoryHierarchyWithHolding"][number];
 
 const RenderHoldings = ({ row }: { row: Holding[] }) => {
-  console.log("rwo", row);
+  console.log("row", row);
   const table = useReactTable({
     data: row,
     columns,

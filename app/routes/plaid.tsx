@@ -55,7 +55,6 @@ export const action = async ({ request }: ActionArgs) => {
   const exchangeResponse = await plaidClient.itemPublicTokenExchange({
     public_token: publicToken,
   });
-  console.log("got this access token", exchangeResponse.data.access_token);
 
   const session = await getSession(request);
   session.set("accessToken", exchangeResponse.data.access_token);
@@ -72,14 +71,12 @@ export default function Plaid() {
   // const submit = useSubmit();
 
   const data = useLoaderData<typeof loader>();
-  console.log("got some data!", data);
 
   const submit = useSubmit();
 
   const { open, ready } = usePlaidLink({
     token: data.link_token,
     onSuccess: (public_token, metadata) => {
-      console.log("submit wtih", public_token, metadata);
       //       submit({ publicToken: public_token });
       // $path("/plaid/exchangeLinkTokenForAccessToken", {
       //   publicToken: public_token,
@@ -99,7 +96,6 @@ export default function Plaid() {
       <button
         color="pink"
         onClick={() => {
-          console.log("clicked!");
           return open();
         }}
         disabled={!ready}
