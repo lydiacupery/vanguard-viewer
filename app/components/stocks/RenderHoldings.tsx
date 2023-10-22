@@ -1,10 +1,10 @@
-import { useLoaderData } from "@remix-run/react";
+import type { ColumnDef } from "@tanstack/react-table";
 import {
-  ColumnDef,
   flexRender,
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import type { Holding } from "plaid";
 import {
   Table,
   TableBody,
@@ -13,11 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import { loader as stocksLoader } from "../../../app/routes/stocks";
-
-export type Holding = ReturnType<
-  typeof useLoaderData<typeof stocksLoader>
->["accountsWithHoldings"][0]["holdings"][0];
 
 export const columns: ColumnDef<Holding>[] = [
   {
@@ -45,10 +40,6 @@ export const columns: ColumnDef<Holding>[] = [
     },
   },
 ];
-
-type Data = Awaited<
-  ReturnType<Awaited<ReturnType<typeof stocksLoader>>["json"]>
->["accountsWithHoldings"][0]["categoryHierarchyWithHolding"][number];
 
 export const RenderHoldings = ({ row }: { row: Holding[] }) => {
   console.log("row", row);

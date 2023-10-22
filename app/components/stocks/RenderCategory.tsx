@@ -4,22 +4,25 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "~/components/ui/accordion";
+import type { CategoryNode } from "~/models/stock.server";
+import { RenderHoldings } from "./RenderHoldings";
 
 export const RenderCategory = ({
   row,
   totalAmount,
   depth,
 }: {
-  row: Data;
+  row: CategoryNode;
   totalAmount?: number;
   depth: number;
 }) => {
-  console.log("row???", row);
-
   const targetAllocation =
-    row.targetAllocation && (totalAmount || 0) * (row.targetAllocation || 0);
+    row.targetAllocation &&
+    (totalAmount || 0) *
+      (Number.parseFloat(row.targetAllocation.toString()) || 0);
 
-  const differenceBetweenActualAndTarget = (row.total || 0) - targetAllocation;
+  const differenceBetweenActualAndTarget =
+    (row.total || 0) - (targetAllocation || 0);
   return (
     <Accordion type="multiple">
       <AccordionItem value="item-1">
@@ -51,10 +54,14 @@ export const RenderCategory = ({
               style={{
                 color: differenceBetweenActualAndTarget > 0 ? "green" : "red",
                 width: 200,
-                backgroundColor:
-                  (Math.abs(differenceBetweenActualAndTarget) > 1000 &&
-                    "lightGray") ||
-                  undefined,
+                padding: 2,
+                // show a border if the difference is greater than 1000
+                border:
+                  differenceBetweenActualAndTarget > 1000
+                    ? "2px solid green"
+                    : differenceBetweenActualAndTarget < -1000
+                    ? "2px solid red"
+                    : undefined,
               }}
             >
               Difference
@@ -71,7 +78,11 @@ export const RenderCategory = ({
             </p>
           </div>
         </AccordionTrigger>
-        <AccordionContent>
+        <AccordionContent
+          style={{
+            background: `rgba(160, 194, 194,${depth / 10})`,
+          }}
+        >
           {row.children.length ? (
             <>
               {row.children.map((child) => (

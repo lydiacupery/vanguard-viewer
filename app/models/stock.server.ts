@@ -1,11 +1,10 @@
-import { Session } from "@remix-run/node";
-import { Holding, InvestmentsHoldingsGetRequest, Security } from "plaid";
-import { plaidClient } from "~/plaid";
-import { fetchCategoriesForTickerList } from "~/routes/yahoo-finance";
+import type { TargetCategoryAllocation } from "@prisma/client";
+import type { Session } from "@remix-run/node";
+import type { Holding, InvestmentsHoldingsGetRequest, Security } from "plaid";
 import * as R from "ramda";
 import { prisma } from "~/db.server";
-import { Asset, TargetCategoryAllocation } from "@prisma/client";
-import { Decimal } from "@prisma/client/runtime";
+import { plaidClient } from "~/plaid";
+import { fetchCategoriesForTickerList } from "~/routes/yahoo-finance";
 
 export const getAccountsWithHoldings = async ({
   session,
@@ -30,7 +29,7 @@ export const getAccountsWithHoldings = async ({
 
   const holdings = response.data.holdings;
 
-  // fetch category for any secrity that doesn't have a category in the cache tabel
+  // fetch category for any security that doesn't have a category in the cache
   fetchCategoriesForTickerList(
     response.data.securities.map((s) => s.ticker_symbol)
   );
@@ -54,7 +53,10 @@ export const getAccountsWithHoldings = async ({
       return {
         ...holding,
         security,
-        assetCategories,
+        assetCategories: assetCategories.map((ac) => ({
+          ...ac,
+          allocation: parseFloat(ac.allocation.toString()),
+        })),
       };
     })
   );
@@ -112,7 +114,6 @@ export const getAccountsWithHoldings = async ({
             await prisma.targetCategoryAllocation.findFirst({
               where: {
                 categoryID: category.id,
-                // userID: session.get("userID"),
               },
             });
 
@@ -124,8 +125,10 @@ export const getAccountsWithHoldings = async ({
           );
           return {
             ...category,
+            targetAllocation:
+              targetAllocation?.allocation &&
+              parseInt(targetAllocation.allocation.toString()),
             holdings: holdingsInCategory,
-            targetAllocation: targetAllocation?.allocation,
           };
         })
       );
@@ -148,14 +151,14 @@ interface RawCategory {
   level: number;
 }
 
-interface CategoryNode {
+export interface CategoryNode {
   category: string;
   id: string;
   children: CategoryNode[];
   parentId?: string;
   holdings: Holding[];
   total?: number;
-  targetAllocation: number;
+  targetAllocation?: number;
 }
 
 // export const buildCategoryHierarchy = (
@@ -237,7 +240,7 @@ export const buildCategoryHierarchy = (
         Holding & {
           security: Security;
           assetCategories: Array<{
-            allocation: Decimal;
+            allocation: number;
             categoryID: string | null;
           }>;
         }
