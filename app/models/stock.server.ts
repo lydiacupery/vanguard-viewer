@@ -280,13 +280,20 @@ export const buildCategoryHierarchy = (
           holding.assetCategories.find((ac) => ac.categoryID === rawCategory.id)
         );
         console.log("holding...", holding);
-        const institution_value = allocation
+        const institution_value = R.isNotNil(allocation)
           ? parseFloat(allocation.toString()) * holding.institution_value
           : holding.institution_value;
+
+        const unrealizedGainLoss =
+          R.isNotNil(allocation) && R.isNotNil(holding.cost_basis)
+            ? parseFloat(allocation.toString()) *
+              (holding.institution_value - holding.cost_basis)
+            : 0;
         return {
           ...holding,
           institution_value,
           allocation,
+          unrealizedGainLoss,
         };
       }),
       parentId: rawCategory.parentId ?? undefined,

@@ -1,4 +1,6 @@
-import type { ColumnDef } from "@tanstack/react-table";
+import { Dialog } from "@radix-ui/themes";
+import { Link, useParams } from "@remix-run/react";
+import type { ColumnDef, Getter } from "@tanstack/react-table";
 import {
   flexRender,
   getCoreRowModel,
@@ -14,10 +16,22 @@ import {
   TableRow,
 } from "~/components/ui/table";
 
+const TickerCell = ({ getValue }: { getValue: Getter<string> }) => {
+  const params = useParams();
+  return (
+    <Dialog.Root>
+      <Link to={`/stocks/${params.accountId}/${getValue()}`}>
+        {`${getValue()}`}
+      </Link>
+    </Dialog.Root>
+  );
+};
+
 export const columns: ColumnDef<Holding>[] = [
   {
     accessorKey: "security.ticker_symbol",
     header: "Ticker",
+    cell: TickerCell,
   },
   {
     accessorKey: "allocation",
@@ -39,17 +53,26 @@ export const columns: ColumnDef<Holding>[] = [
       }).format(getValue() as number)}`;
     },
   },
+  {
+    accessorKey: "unrealizedGainLoss",
+    header: "Unrealized Gain/Loss",
+    cell({ getValue }) {
+      // todo, move to shared helper
+      return `${Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(getValue() as number)}`;
+    },
+  },
 ];
 
 export const RenderHoldings = ({ row }: { row: Holding[] }) => {
-  console.log("row", row);
   const table = useReactTable({
     data: row,
     columns,
     getCoreRowModel: getCoreRowModel(),
     enableExpanding: true,
   });
-  // todo, how to show holdings???
 
   return (
     <Table>

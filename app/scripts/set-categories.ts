@@ -82,10 +82,8 @@ const tickerToAllocations: Record<
     us: {
       largeValue: "18.11200",
       largeBlend: "13.12800",
-      largeGrowth: "0.00000",
       middleValue: "35.96800",
       middleBlend: "23.81500",
-      middleGrowth: "0.00000",
       smallValue: "3.82200",
       smallBlend: "4.62500",
       smallGrowth: "0.53000",
@@ -119,7 +117,6 @@ const tickerToAllocations: Record<
       middleBlend: "8.28800",
       middleGrowth: "4.42800",
       smallValue: "0.01700",
-      smallBlend: "0.00000",
       smallGrowth: "0.03100",
     },
   },
@@ -203,7 +200,7 @@ const tickerToAllocations: Record<
   },
   AAAU: {
     us: {
-      middleBlend: "1",
+      middleBlend: "100",
     },
   },
   ISCG: {
@@ -255,7 +252,6 @@ const tickerToAllocations: Record<
       middleValue: "24.27400",
       middleBlend: "20.07000",
       middleGrowth: "7.82200",
-      smallValue: "0.00000",
       smallBlend: "0.54600",
     },
   },
@@ -292,7 +288,6 @@ const tickerToAllocations: Record<
   },
   VBK: {
     us: {
-      largeValue: "0.00000",
       largeBlend: "0.33700",
       middleValue: "1.18100",
       middleBlend: "12.35200",
@@ -347,10 +342,8 @@ const tickerToAllocations: Record<
       largeGrowth: "1.68400",
       middleValue: "9.93800",
       middleBlend: "7.81900",
-      middleGrowth: "0.00000",
       smallValue: "2.89400",
       smallBlend: "0.78200",
-      smallGrowth: "0.00000",
     },
   },
   VDC: {
@@ -387,8 +380,6 @@ const tickerToAllocations: Record<
       middleValue: "0.58800",
       middleBlend: "4.44900",
       middleGrowth: "6.93100",
-      smallValue: "0.00000",
-      smallBlend: "0.00000",
       smallGrowth: "0.04800",
     },
   },
@@ -646,6 +637,7 @@ async function main() {
       });
     }
   });
+  console.log("✅ done setting categories");
 }
 
 void (async () => main())();

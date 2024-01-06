@@ -1,6 +1,6 @@
 import type { LoaderArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
+import { Outlet, useLoaderData } from "@remix-run/react";
 import { RenderCategory } from "~/components/stocks/RenderCategory";
 import type { CategoryNode } from "~/models/stock.server";
 import { getAccountsWithHoldings } from "~/models/stock.server";
@@ -68,6 +68,7 @@ export default function Stocks() {
 
   return (
     <div>
+      <Outlet />
       <h1>Stocks</h1>
       {data.accountId ? (
         data.accountsWithHoldings[0].categoryHierarchyWithHolding.map(
