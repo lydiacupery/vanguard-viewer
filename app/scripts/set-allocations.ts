@@ -147,6 +147,36 @@ async function main() {
     throw new Error("Stock category not found");
   }
 
+  const global = await prisma.category.findFirst({
+    where: {
+      name: "Global Stock",
+    },
+  });
+
+  if (!global) {
+    throw new Error("Global category not found");
+  }
+
+  const emergingMarket = await prisma.category.findFirst({
+    where: {
+      name: "Emerging Markets",
+    },
+  });
+
+  if (!emergingMarket) {
+    throw new Error("Emerging Market category not found");
+  }
+
+  const developedMarket = await prisma.category.findFirst({
+    where: {
+      name: "Developed Markets",
+    },
+  });
+
+  if (!developedMarket) {
+    throw new Error("Developed Market category not found");
+  }
+
   const USER_ID = "cln3bw9460000qcp8o6v6c8yv";
 
   await prisma.targetCategoryAllocation.deleteMany({});
@@ -157,7 +187,21 @@ async function main() {
         allocation: 0.86,
         userID: USER_ID,
       },
-
+      {
+        categoryID: global.id,
+        allocation: 0.2589,
+        userID: USER_ID,
+      },
+      {
+        categoryID: emergingMarket.id,
+        allocation: 0.0714,
+        userID: USER_ID,
+      },
+      {
+        categoryID: developedMarket.id,
+        allocation: 0.1875,
+        userID: USER_ID,
+      },
       {
         categoryID: USStock.id,
         allocation: 0.602,

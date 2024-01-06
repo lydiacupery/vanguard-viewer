@@ -27,12 +27,9 @@ export async function loader({ request, params }: LoaderArgs) {
 
 export async function action({ request, params }: LoaderArgs) {
   // set category id for asset
-  console.log("in sumbit1!!!");
   const body = new URLSearchParams(await request.text());
   const ticker = body.get("ticker");
   const categoryId = body.get("categoryId");
-  console.log("ticker", ticker);
-  console.log("categoryId", categoryId);
   if (ticker && categoryId) {
     await prisma.asset.update({
       where: {
