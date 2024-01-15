@@ -12,6 +12,8 @@ import {
 
 import { getUser } from "~/session.server";
 import stylesheet from "~/tailwind.css";
+import "@radix-ui/themes/styles.css";
+import { Theme } from "@radix-ui/themes";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: stylesheet },
@@ -32,10 +34,12 @@ export default function App() {
         <Links />
       </head>
       <body className="h-full ">
-        <Outlet />
-        <ScrollRestoration />
-        <Scripts />
-        <LiveReload />
+        <Theme>
+          <Outlet />
+          <ScrollRestoration />
+          <Scripts />
+          <LiveReload />
+        </Theme>
       </body>
     </html>
   );
