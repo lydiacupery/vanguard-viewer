@@ -1,5 +1,5 @@
-import { Dialog, Flex, Text, Button } from "@radix-ui/themes";
-import { LoaderArgs, defer, json } from "@remix-run/node";
+import { Dialog, Flex, Text } from "@radix-ui/themes";
+import { LoaderArgs, defer } from "@remix-run/node";
 import {
   Await,
   Link,
@@ -8,22 +8,24 @@ import {
   useParams,
 } from "@remix-run/react";
 import { Suspense } from "react";
-import { getArticlesSummary, scrapeArticlesForStock } from "~/summarizer";
+import {
+  getArticlesSummary,
+  getStockName,
+  scrapeArticlesForStock,
+} from "~/summarizer";
 
-const getStockData = async (stockId: string | undefined) => {
-  if (!stockId) {
-    return null;
-  }
-  // scrape stock data
-
+async function getOutlook(stockId: string) {
   await scrapeArticlesForStock(stockId);
   return getArticlesSummary(stockId);
-};
+}
 
 export async function loader({ request, params }: LoaderArgs) {
   const stockId = params.stockId;
+  if (!stockId) {
+    return defer({ outlook: null, name: null });
+  }
 
-  return defer({ summary: getStockData(stockId) });
+  return defer({ outlook: getOutlook(stockId), name: getStockName(stockId) });
 }
 
 // route with dialog component
@@ -41,38 +43,31 @@ export default function AccountStock() {
       }}
     >
       <Dialog.Content style={{ maxWidth: 450 }}>
-        <Dialog.Title>Stock Info</Dialog.Title>
-        <Suspense fallback={<div>Loading...</div>}>
-          <Await
-            resolve={data.summary}
-            errorElement={<div>Failed to load stock data</div>}
-          >
-            {(summary) => (
-              <Flex direction="column" gap="3">
-                {/* <label>
-		      <Text as="div" size="2" mb="1" weight="bold">
-			Name
-		      </Text>
-		      <TextField.Input
-			defaultValue="Freja Johnsen"
-			placeholder="Enter your full name"
-		      />
-		    </label>
-		    <label>
-		      <Text as="div" size="2" mb="1" weight="bold">
-			Email
-		      </Text>
-		      <TextField.Input
-			defaultValue="freja@example.com"
-			placeholder="Enter your email"
-		      />
-		    </label> */}
-                <Text as="div">Ticker Summary</Text>
-                <Text as="div"> {summary || ""} </Text>
-              </Flex>
-            )}
-          </Await>
-        </Suspense>
+        <Dialog.Title>{params.stockId} Stock</Dialog.Title>
+        <Flex direction="column" gap="3">
+          <Text as="div" weight="bold" size="3">
+            Name
+          </Text>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Await
+              resolve={data && data.name}
+              errorElement={<div>Failed to load stock data</div>}
+            >
+              {(name) => <Text as="div"> {name || ""} </Text>}
+            </Await>
+          </Suspense>
+          <Text as="div" weight="bold" size="3">
+            Outlook
+          </Text>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Await
+              resolve={data && data.outlook}
+              errorElement={<div>Failed to load stock data</div>}
+            >
+              {(outlook) => <Text as="div"> {outlook || ""} </Text>}
+            </Await>
+          </Suspense>
+        </Flex>
 
         <Flex gap="3" mt="4" justify="end">
           <Dialog.Close>

@@ -7,6 +7,14 @@ const path = require("path");
 
 var axios = require("axios");
 
+export const getStockName = async (stockName: string) => {
+  const tickerDetails = await polygonRestClient.reference.tickerDetails(
+    stockName
+  );
+  console.log("ticker details", tickerDetails);
+  return tickerDetails.results && tickerDetails.results.name;
+};
+
 export const scrapeArticlesForStock = async (stockName: string) => {
   const folderName = `${__dirname}/scraped/${stockName}`;
   console.log("folder name!", folderName);
@@ -16,15 +24,19 @@ export const scrapeArticlesForStock = async (stockName: string) => {
   if (!directoryExists) {
     console.log("Make directory and populate!!");
     await fsPromises.mkdir(folderName, { recursive: true });
+    console.log("made dir!");
 
-    const tickerNews = await polygonRestClient.reference.tickerNews({
-      ticker: stockName,
-      limit: 5,
-    });
-
-    // for each result, scrape the article
     try {
+      console.log("fetch data!");
+      const tickerNews = await polygonRestClient.reference.tickerNews({
+        ticker: stockName,
+        limit: 5,
+      });
+      console.log("data fetched for articles...", tickerNews.results);
+
+      // for each result, scrape the article
       for (const result of tickerNews.results) {
+        console.log("parsing result url....", result.article_url);
         if (result.article_url) {
           var targetUrl = result.article_url;
 
@@ -56,7 +68,17 @@ export const scrapeArticlesForStock = async (stockName: string) => {
         }
       }
     } catch (error) {
-      console.log("Error scraping article", error);
+      console.log("Error scraping articles", error);
+      // remove the directory
+      await fsPromises
+        .rmdir(folderName, { recursive: true })
+        .then(() => {
+          console.log("removed dir!");
+        })
+        .catch((e: any) => {
+          console.log("error removing dir", e);
+        });
+      throw error;
     }
   }
 };
@@ -98,14 +120,14 @@ export const getArticlesSummary = async (stock: string) => {
       {
         role: "user",
         content:
-          "Summarizes all the data provided about a stock, or extrapolates data about the specific stock based on the data provided.  Please focus on the stock provided and make the response short.  Provides a few sentence summary of the stock and its outlook based on all of the provided news articles.  If none of the news articles are not specific to the stock, provides a summary of what one might extrapolate about the stock from the news articles.",
+          "Summarizes all the data provided about a stock, or extrapolates data about the specific stock based on the data provided.  Provides a few sentence summary of the stock and its outlook based on all of the provided news articles.  If none of the news articles are not specific to the stock, provides a summary of what one might extrapolate about the stock from the news articles.",
       },
       {
         role: "system",
-        content: `Please summarize the data provided about ${stock} or what could be extrapolated about ${stock} from the provided articles. ${fileContents}`,
+        content: `Please summarize the data provided about ${stock}.  If no data can be found about ${stock}, extrapolated information about ${stock} from the provided articles. ${fileContents}`,
       },
     ],
-    temperature: 0.2,
+    temperature: 0.1,
   });
   console.log("response!", JSON.stringify(response.choices[0].message.content));
 
